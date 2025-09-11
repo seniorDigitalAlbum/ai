@@ -26,7 +26,7 @@ negative_classes = ['sad', 'anxious', 'hurt']
 
 
 # --- API 엔드포인트 정의 ---
-@app.post("/predict-emotion")
+@app.post("/predict_emotion")
 async def predict_emotion(file: UploadFile = File(...)):
     # 1. 이미지 데이터 읽기
     contents = await file.read()
