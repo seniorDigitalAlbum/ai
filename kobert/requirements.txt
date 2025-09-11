@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+torch
+pandas
+transformers
+scikit-learn
+protobuf
+sentencepiece
+git+https://github.com/monologg/KoBERT-transformers.git
