@@ -18,21 +18,15 @@ app.add_middleware(
     allow_headers=["*"],  # 모든 헤더 허용
 )
 
-# --- 두 모델 모두 로드 (경로를 정확히 지정하세요) ---
-# 1단계 메인 모델 (상위 4개 감정 분류)
+# --- 단일 모델 로드 ---
 # 예시 경로: "/content/drive/MyDrive/yolo_dataset/train/weights/best.pt"
-main_model = YOLO("main_best.pt")
-
-# 2단계 하위 모델 (negative_cluster 세부 분류)
-# 예시 경로: "/content/drive/MyDrive/yolo_negative_cluster_dataset/train/weights/best.pt"
-negative_submodel = YOLO("sub_best.pt")
+# 이 모델은 6가지 세부 감정을 모두 분류하도록 학습되어야 합니다.
+single_model = YOLO("best.pt")
 
 # --- 클래스 매핑 설정 ---
-# 1단계 메인 모델의 클래스 이름과 ID
-main_classes = ['joy', 'angry', 'embarrassed', 'negative_cluster']
-
-# 2단계 네거티브 모델의 클래스 이름과 ID
-negative_classes = ['sad', 'anxious', 'hurt']
+# 단일 모델의 클래스 이름과 ID
+# 이 순서는 모델 학습 시 사용한 data.yaml의 names 순서와 동일해야 합니다.
+all_classes = ['joy', 'angry', 'sad', 'embarrassed', 'hurt']
 
 
 # --- API 엔드포인트 정의 ---
@@ -45,49 +39,45 @@ async def predict_emotion(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=400, detail="Invalid image file")
 
-    final_prediction = ""
+    # 2. 초기값 설정
+    final_prediction = "No emotion detected"
     confidence = 0.0
     bbox = []
 
-    # 2. 1단계 모델 추론 (메인 모델)
-    results_main = main_model(image)
+    # 3. 단일 모델 추론 실행
+    # conf 파라미터를 낮게 설정하여 모든 예측을 포함 (디버깅용)
+    results = single_model(image, conf=0.1)
 
-    # 3. 1단계 결과 파싱
-    for result in results_main:
-        if result.boxes:
+    # 4. 결과 파싱
+    for result in results:
+        if result.boxes is not None and len(result.boxes) > 0:
             box = result.boxes[0]
-            main_class_id = int(box.cls)
-            main_class_name = main_classes[main_class_id]
+            class_id = int(box.cls)
+            
+            # 클래스 ID로 감정 이름 가져오기
+            final_prediction = all_classes[class_id]
+            confidence = float(box.conf)
             
             # 바운딩 박스 정보 추출
             bbox = [round(float(c), 2) for c in box.xyxy[0]]
             
-            # 4. 2단계 모델 추론 (필요 시)
-            if main_class_name == 'negative_cluster':
-                # 해당 바운딩 박스 부분만 잘라내기
-                img_array = np.array(image)
-                x1, y1, x2, y2 = [int(c) for c in box.xyxy[0]]
-                cropped_img_array = img_array[y1:y2, x1:x2]
-                cropped_image = Image.fromarray(cropped_img_array)
+            break  # 첫 번째 감지된 객체만 처리
 
-                # 2단계 모델에 잘라낸 이미지 입력
-                results_negative = negative_submodel(cropped_image)
-                
-                # 2단계 결과 파싱
-                if results_negative[0].boxes:
-                    box_negative = results_negative[0].boxes[0]
-                    negative_class_id = int(box_negative.cls)
-                    final_prediction = negative_classes[negative_class_id]
-                    confidence = float(box_negative.conf)
-            else:
-                # 1단계 모델의 예측이 최종 결과
-                final_prediction = main_class_name
-                confidence = float(box.conf)
-            
-            break # 첫 번째 감지된 객체만 처리
+    # 5. No emotion detected 처리
+    if final_prediction == "No emotion detected":
+        return {
+            "emotion": "neutral",  # neutral로 정규화
+            "confidence": 0.0,     # 신뢰도 0.0
+            "bounding_box": []
+        }
 
+    # 6. 정상적인 감정 감지 결과 반환
     return {
-        "emotion": final_prediction if final_prediction else "No emotion detected",
+        "emotion": final_prediction,
         "confidence": round(confidence, 2),
         "bounding_box": bbox
     }
+
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)
