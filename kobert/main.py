@@ -3,9 +3,21 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from transformers import AutoTokenizer, AutoModel
 from typing import Dict, List
+
+app = FastAPI()
+
+# CORS 설정 추가
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 모든 오리진 허용 (개발용)
+    allow_credentials=True,
+    allow_methods=["*"],  # 모든 HTTP 메소드 허용
+    allow_headers=["*"],  # 모든 헤더 허용
+)
 
 # ----------------------------
 # 1. 모델 아키텍처 정의 (학습 스크립트의 KoBERTCls 클래스 재사용)

@@ -2,11 +2,21 @@ import io
 import uvicorn
 import numpy as np
 from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image
 from ultralytics import YOLO
 
 # FastAPI 앱 인스턴스 생성
 app = FastAPI()
+
+# CORS 설정 추가
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 모든 오리진 허용 (개발용)
+    allow_credentials=True,
+    allow_methods=["*"],  # 모든 HTTP 메소드 허용
+    allow_headers=["*"],  # 모든 헤더 허용
+)
 
 # --- 두 모델 모두 로드 (경로를 정확히 지정하세요) ---
 # 1단계 메인 모델 (상위 4개 감정 분류)
